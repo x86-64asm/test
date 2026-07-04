@@ -1,4 +1,5 @@
 #include "musab_lang.h"
+#include <string.h>
 
 // Parser for Musab Language
 // Builds Abstract Syntax Tree (AST) from tokens
@@ -111,14 +112,11 @@ static char *get_ident(void) {
   return name;
 }
 
-// Forward declarations
-static Node *expr(void);
-static Node *stmt(void);
-static Type *parse_type(void);
-
 static Type *parse_type(void) {
   if (current_token->kind == TK_IDENT) {
-    char *type_name = get_ident();
+    char *type_name = calloc(1, current_token->len + 1);
+    strncpy(type_name, current_token->loc, current_token->len);
+    advance();
     
     if (strcmp(type_name, "int") == 0) {
       return get_int_type();
@@ -136,6 +134,10 @@ static Type *parse_type(void) {
   error_tok(current_token, "expected type name");
   return NULL;
 }
+
+// Forward declarations
+static Node *expr(void);
+static Node *stmt(void);
 
 static Node *primary(void) {
   // Number
@@ -403,19 +405,25 @@ Obj *parse(Token *tok) {
       }
       skip(current_token, ")");
       
+      // Check for return type (optional)
       if (equal(current_token, ":")) {
         advance();
-        parse_type();  // return type
+        parse_type();  // return type - just consume it for now
       }
       
-      skip(current_token, "{");
-      
-      // Skip function body
-      int brace_count = 1;
-      while (brace_count > 0 && current_token->kind != TK_EOF) {
-        if (equal(current_token, "{")) brace_count++;
-        if (equal(current_token, "}")) brace_count--;
+      // Function body
+      if (equal(current_token, "{")) {
         advance();
+        
+        // Skip function body
+        int brace_count = 1;
+        while (brace_count > 0 && current_token->kind != TK_EOF) {
+          if (equal(current_token, "{")) brace_count++;
+          if (equal(current_token, "}")) brace_count--;
+          advance();
+        }
+      } else {
+        error_tok(current_token, "expected '{' after function declaration");
       }
       
       continue;
